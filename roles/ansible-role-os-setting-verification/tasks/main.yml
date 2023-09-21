@@ -1,0 +1,1358 @@
+---
+# tasks file for ansible-role-os-setting-verification
+- block:
+    - name: Get date
+      shell: echo `date +%d%m%Y`
+      register: cur_date
+    
+    - name: Check hostname status
+      shell: hostname
+      register: hostname_result
+    
+    - name: Set hostname variable
+      set_fact:
+        hostname: "{{ hostname_result.stdout_lines[0] }}"
+        date: "{{ cur_date.stdout_lines[0] }}"
+    - debug:
+        msg:
+          - "Hostname : {{ hostname }}"
+          - "Date : {{ date }}"
+              
+    - name: Set host packages variable
+      set_fact:
+        host_packages: "{{ inventory_hostname }}_packages"
+    - debug: var=host_packages
+    
+    - name: Show value of 'custom_packages' variable
+      set_fact:
+        custom_packages: "{{ lookup('vars', host_packages )}}"
+    - debug: var=custom_packages
+    
+    - set_fact: OUTPUTFILE="/tmp/{{ item }}_verification_results"
+      with_items: "{{ hostname }}"
+    
+    - name: Remove existing log file
+      file:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        state: absent
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "*************************************Verification results are as follows:***************************"
+        create: yes
+      delegate_to: localhost
+    
+    - debug: var=hostname
+    
+################################## print host name ################################################
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] hostname is set correctly ---- {{ hostname }} - {{ ansible_default_ipv4.address }}"
+      when: hostname==inventory_hostname
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] hostname is not set correctly ---- {{ hostname }} - {{ ansible_default_ipv4.address }}"
+      when: hostname!=inventory_hostname
+      delegate_to: localhost
+    
+################################## print package information ################################################
+    - name: "Check if rpm packages are installed"
+      package_facts:
+       manager: "auto"
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[INFO] *************Checking common packages which are part of AMI**************"
+      delegate_to: localhost
+    
+    - name: "Check if AMI packages are installed or not"
+      shell: yum list installed "{{ item }}"
+      loop: "{{ AMI_packages }}"
+      register: AMI_packages_check
+      ignore_errors: true
+    
+    - name: List of AMI packages which are installed
+      shell: echo "[INFO] {{ item.cmd | regex_replace('^u','') }} is installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed == false
+      loop: "{{ AMI_packages_check.results }}"
+      delegate_to: localhost
+    
+    - name: List of AMI packages which are not installed
+      shell: echo "[ERROR] {{ item.cmd | regex_replace('^u','') }} is not installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed == true
+      loop: "{{ AMI_packages_check.results }}"
+      delegate_to: localhost
+    
+################################## print aws cli version ################################################
+    - name: check if aws-cli is installed or not
+      shell: aws --version
+      register: aws_cli_result
+      become: no
+    
+    - debug: var=aws_cli_result.stdout
+    
+    - shell: echo "[INFO] aws-cli version --  {{ aws_cli_result.stdout }} is installed" >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: aws_cli_result.stdout!=""
+      delegate_to: localhost
+    
+    - shell: echo "[ERROR] aws-cli is not installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: aws_cli_result.stdout==""
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[INFO] *************Checking group1 common packages**************" 
+      when: inventory_hostname in groups['group1']
+      delegate_to: localhost
+    
+    - name: "Check if Group1 packages are installed or not"
+      shell: yum list installed "{{ item }}"
+      loop: "{{ group1_packages }}"
+      register: group1_packages_check
+      ignore_errors: true
+      when: inventory_hostname in groups['group1']
+    
+    - debug: var=item.cmd
+      loop: "{{ group1_packages_check.results }}"
+    
+    
+    - name: List of Group1 packages which are installed
+      shell: echo "[INFO] {{ item.cmd | regex_replace('^u','') }} is installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed==false and inventory_hostname in groups['group1']
+      loop: "{{ group1_packages_check.results }}"
+      delegate_to: localhost
+    
+    
+    - name: List of Group1 packages which are not installed
+      shell: echo "[ERROR] {{ item.cmd | regex_replace('^u','') }} is not installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed==true and inventory_hostname in groups['group1']
+      loop: "{{ group1_packages_check.results }}"
+      delegate_to: localhost
+    
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[INFO] *************Checking group2 common packages**************" 
+      when: inventory_hostname in groups['group2']
+      delegate_to: localhost
+    
+    - name: "Check if Group2 packages are installed or not"
+      shell: yum list installed "{{ item }}"
+      loop: "{{ group2_packages }}"
+      register: group2_packages_check
+      ignore_errors: true
+      when: inventory_hostname in groups['group2']
+    
+    - name: List of Group2 packages which are installed
+      shell: echo "[INFO] {{ item.cmd | regex_replace('^u','') }} is installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed == false and inventory_hostname in groups['group2']
+      loop: "{{ group2_packages_check.results }}"
+      delegate_to: localhost
+    
+    - name: List of Group2 packages which are not installed
+      shell: echo "[ERROR] {{ item.cmd | regex_replace('^u','') }} is not installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed == true and inventory_hostname in groups['group2']
+      loop: "{{ group2_packages_check.results }}"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[INFO] *************Checking VM specific packages**************" 
+      when: inventory_hostname==hostname
+      delegate_to: localhost
+    
+    - name: "Check if VM Specific packages are installed or not"
+      shell: yum list installed "{{ item }}"
+      loop: "{{ custom_packages }}"
+      register: custom_packages_check
+      ignore_errors: true
+      when: inventory_hostname==hostname
+    
+    - name: List of VM Specific packages which are installed
+      shell: echo "[INFO] {{ item.cmd | regex_replace('^u','') }} is installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed == false and inventory_hostname==hostname
+      loop: "{{ custom_packages_check.results }}"
+      delegate_to: localhost
+    
+    - name: List of VM Specific packages which are not installed
+      shell: echo "[ERROR] {{ item.cmd | regex_replace('^u','') }} is not installed. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.failed == true and inventory_hostname==hostname
+      loop: "{{ custom_packages_check.results }}"
+      delegate_to: localhost
+
+################################## print SELINUX ################################################
+    - name: Check SELINUX status
+      shell: sestatus|grep disabled
+      register: SELINUX_result
+    
+    - debug: var=SELINUX_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] SELINUX setting done correctly in /etc/sysconfig/selinux file\n{{ SELINUX_result.stdout }}"
+      when: SELINUX_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] SELINUX setting is not done correctly in /etc/sysconfig/selinux file\n{{ SELINUX_result.stdout }}"
+      when: SELINUX_result.stdout==""
+      delegate_to: localhost
+    
+################################## print firewalld status ################################################
+    - name: Check Firewalld.service status
+      shell: "systemctl status firewalld.service"
+      register: firewalld_result
+    
+    - debug: var=firewalld_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] firewalld.service status is not installed"
+      when: firewalld_result.stdout==""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] firewalld.service status is installed"
+      when: firewalld_result.stdout!=""
+      delegate_to: localhost
+    
+################################## print default runlevel status ################################################
+    - name: Check default_runlevel status
+      shell: ls -la /etc/systemd/system/default.target
+      register: default_runlevel_result
+
+    - debug: var=default_runlevel_result
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] default_runlevel is set correctly\n{{ default_runlevel_result.stdout }}\n"
+      when: default_runlevel_result.stdout!=""
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] default_runlevel is not set correctly\n{{ default_runlevel_result.stdout }}\n"
+      when: default_runlevel_result.stdout==""
+      delegate_to: localhost
+ 
+################################## print locale settings ################################################
+    - name: Check locale -a status
+      shell: locale -a | grep ja_JP.SJIS
+      register: locale_a_result
+
+    - debug: var=locale_a_result.stdout
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] locale -a is set correctly\n{{ locale_a_result.stdout }}\n"
+      when: locale_a_result.stdout!=""
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] locale -a is not set correctly\n{{ locale_a_result.stdout }}\n"
+      when: locale_a_result.stdout==""
+      delegate_to: localhost
+
+    - name: Check localectl status
+      shell: localectl status|grep ja_JP.UTF-8 -A 5
+      register: localectl_result
+
+    - debug: var=localectl_result.stdout
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] localectl is set correctly\n{{ localectl_result.stdout }}\n"
+      when: localectl_result.stdout!="" 
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] localectl is not set correctly\n{{ localectl_result.stdout }}\n"
+      when: localectl_result.stdout=="" 
+      delegate_to: localhost
+
+################################## print timedatectl settings ################################################
+    - name: Check timedatectl status
+      shell: timedatectl status|grep Asia/Tokyo
+      register: timedatectl_result
+    
+    - debug: var=timedatectl_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] timedatectl is set correctly\n{{ timedatectl_result.stdout }}"
+      when: timedatectl_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] timedatectl is not set correctly\n{{ timedatectl_result.stdout }}"
+      when: timedatectl_result.stdout==""
+      delegate_to: localhost
+    
+################################## print /etc/sysctl.conf settings ################################################
+    - name: Check /etc/sysctl.conf net.ipv6.conf.all.disable_ipv6 settings
+      shell: cat /etc/sysctl.conf|grep net.ipv6.conf.all.disable_ipv6
+      register: ipv6_result
+    
+    - debug: var=ipv6_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] ipv6 value is set correctly\n{{ ipv6_result.stdout }}"
+      when: ipv6_result.stdout=="net.ipv6.conf.all.disable_ipv6 = 1"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] ipv6 is not set correctly\n{{ ipv6_result.stdout }}"
+      when: ipv6_result.stdout!="net.ipv6.conf.all.disable_ipv6 = 1"
+      delegate_to: localhost
+    
+    - name: Check /etc/sysctl.conf - net.ipv6.conf.default.disable_ipv6 settings
+      shell: cat /etc/sysctl.conf|grep net.ipv6.conf.default.disable_ipv6
+      register: ipv6_default_result
+    
+    - debug: var=ipv6_default_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] net.ipv6.conf.default.disable_ipv6 value is set correctly\n{{ ipv6_default_result.stdout }}"
+      when: ipv6_default_result.stdout=="net.ipv6.conf.default.disable_ipv6 = 1"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] net.ipv6.conf.default.disable_ipv6 is not set correctly\n{{ ipv6_default_result.stdout }}"
+      when: ipv6_default_result.stdout!="net.ipv6.conf.default.disable_ipv6 = 1"
+      delegate_to: localhost
+    
+    
+    - name: Check /etc/sysctl.conf net.ipv4.tcp_timestamps settings
+      shell: cat /etc/sysctl.conf|grep net.ipv4.tcp_timestamps
+      register: ipv4_result
+    
+    - debug: var=ipv4_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] ipv4 value is set correctly\n{{ ipv4_result.stdout }}"
+      when: ipv4_result.stdout=="net.ipv4.tcp_timestamps = 0"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] ipv4 is not set correctly\n{{ ipv4_result.stdout }}"
+      when: ipv4_result.stdout!="net.ipv4.tcp_timestamps = 0"
+      delegate_to: localhost
+    
+    - name: Check /etc/sysctl.conf kernel.sysrq settings
+      shell: cat /etc/sysctl.conf|grep kernel.sysrq
+      register: kernel_sysrq_result
+    
+    - debug: var=kernel_sysrq_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] kernel.sysrq value is set correctly\n{{ kernel_sysrq_result.stdout }}"
+      when: kernel_sysrq_result.stdout=="kernel.sysrq = 0"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] kernel.sysrq is not set correctly\n{{ kernel_sysrq_result.stdout }}"
+      when: kernel_sysrq_result.stdout!="kernel.sysrq = 0"
+      delegate_to: localhost
+
+    - name: Check /etc/sysctl.conf kernel.unknown_nmi_panic settings
+      shell: cat /etc/sysctl.conf|grep kernel.unknown_nmi_panic
+      register: kernel_unknown_nmi_panic_result
+    
+    - debug: var=kernel_unknown_nmi_panic_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] kernel.unknown_nmi_panic value is set correctly\n{{ kernel_unknown_nmi_panic_result.stdout }}"
+      when: kernel_unknown_nmi_panic_result.stdout=="kernel.unknown_nmi_panic = 1"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] kernel.unknown_nmi_panic is not set correctly\n{{ kernel_unknown_nmi_panic_result.stdout }}"
+      when: kernel_unknown_nmi_panic_result.stdout!="kernel.unknown_nmi_panic = 1"
+      delegate_to: localhost
+    
+    - name: Check /etc/sysctl.conf net.ipv4.conf.all.accept_redirects settings
+      shell: cat /etc/sysctl.conf|grep net.ipv4.conf.all.accept_redirects
+      register: net_ipv4_conf_all_accept_redirects_result
+    
+    - debug: var=net_ipv4_conf_all_accept_redirects_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] net.ipv4.conf.all.accept_redirects value is set correctly\n{{ net_ipv4_conf_all_accept_redirects_result.stdout }}"
+      when: net_ipv4_conf_all_accept_redirects_result.stdout=="net.ipv4.conf.all.accept_redirects = 0"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] net.ipv4.conf.all.accept_redirects is not set correctly\n{{ net_ipv4_conf_all_accept_redirects_result.stdout }}"
+      when: net_ipv4_conf_all_accept_redirects_result.stdout!="net.ipv4.conf.all.accept_redirects = 0"
+      delegate_to: localhost
+    
+    
+################################## print /etc/yum.conf settings ################################################
+    - name: Check /etc/yum.conf gpgcheck settings
+      shell: cat /etc/yum.conf|grep gpgcheck
+      register: gpgcheck_result
+    
+    - debug: var=gpgcheck_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] gpgcheck value is set correctly\n{{ gpgcheck_result.stdout }}"
+      when: gpgcheck_result.stdout=="gpgcheck=1"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] gpgcheck is not set correctly\n{{ gpgcheck_result.stdout }}"
+      when: gpgcheck_result.stdout!="gpgcheck=1"
+      delegate_to: localhost
+    
+    - name: Check /etc/yum.conf installonly_limit settings
+      shell: cat /etc/yum.conf|grep installonly_limit
+      register: installonly_limit_result
+    
+    - debug: var=installonly_limit_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] installonly_limit value is set correctly\n{{ installonly_limit_result.stdout }}"
+      when: installonly_limit_result.stdout=="installonly_limit=3"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] installonly_limit is not set correctly\n{{ installonly_limit_result.stdout }}"
+      when: installonly_limit_result.stdout!="installonly_limit=3"
+      delegate_to: localhost
+    
+    - name: Check /etc/yum.conf clean_requirements_on_remove settings
+      shell: cat /etc/yum.conf|grep clean_requirements_on_remove
+      register: clean_requirements_on_remove_result
+    
+    - debug: var=clean_requirements_on_remove_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] clean_requirements_on_remove value is set correctly\n{{ clean_requirements_on_remove_result.stdout }}"
+      when: clean_requirements_on_remove_result.stdout=="clean_requirements_on_remove=True"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] clean_requirements_on_remove is not set correctly\n{{ clean_requirements_on_remove_result.stdout }}"
+      when: clean_requirements_on_remove_result.stdout!="clean_requirements_on_remove=True"
+      delegate_to: localhost
+    
+    - name: Check /etc/yum.conf best settings
+      shell: cat /etc/yum.conf|grep best
+      register: best_result
+    
+    - debug: var=best_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] best value is set correctly\n{{ best_result.stdout }}"
+      when: best_result.stdout=="best=True"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] best is not set correctly\n{{ best_result.stdout }}"
+      when: best_result.stdout!="best=True"
+      delegate_to: localhost
+    
+    - name: Check /etc/yum.conf skip_if_unavailable settings
+      shell: cat /etc/yum.conf|grep skip_if_unavailable
+      register: skip_if_unavailable_result
+    
+    - debug: var=skip_if_unavailable_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] skip_if_unavailable value is set correctly\n{{ skip_if_unavailable_result.stdout }}"
+      when: skip_if_unavailable_result.stdout=="skip_if_unavailable=False"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] skip_if_unavailable is not set correctly\n{{ skip_if_unavailable_result.stdout }}"
+      when: skip_if_unavailable_result.stdout!="skip_if_unavailable=False"
+      delegate_to: localhost
+    
+    
+################################## print /etc/ssh/sshd_config settings ################################################
+    - name: cat /etc/ssh/sshd_config|grep "Ciphers aes128"
+      shell: cat /etc/ssh/sshd_config|grep "Ciphers aes128"
+      register: ciphers_result
+      ignore_errors: true
+    
+    - debug: var=ciphers_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] Ciphers entry is set correctly in /etc/ssh/sshd_config\n{{ ciphers_result.stdout }}"
+      when: ciphers_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] Ciphers entry is not set correctly in /etc/ssh/sshd_config\n{{ ciphers_result.stdout }}"
+      when: ciphers_result.stdout==""
+      delegate_to: localhost
+    
+    - name: cat /etc/sysconfig/sshd|grep CRYPTO_POLICY
+      shell: cat /etc/sysconfig/sshd|grep CRYPTO_POLICY=
+      register: CRYPTO_result
+    - debug: var=CRYPTO_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] CRYPTO setting done correctly in /etc/sysconfig/sshd file\n{{ CRYPTO_result.stdout }}"
+      when: CRYPTO_result.stdout=="CRYPTO_POLICY="
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] CRYPTO setting is not done correctly in /etc/sysconfig/sshd file\n{{ CRYPTO_result.stdout }}"
+      when: CRYPTO_result.stdout=="# CRYPTO_POLICY="
+      delegate_to: localhost
+    
+    - shell: cat /etc/ssh/sshd_config | grep "^PermitRootLogin without-password"
+      register: PermitRootLogin_result
+    
+    - debug: var=PermitRootLogin_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] PermitRootLogin setting is done correctly in /etc/ssh/sshd_config file\n{{ PermitRootLogin_result.stdout }}"
+      when: PermitRootLogin_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] PermitRootLogin setting is not done correctly in /etc/ssh/sshd_config file\n{{ PermitRootLogin_result.stdout }}"
+      when: PermitRootLogin_result.stdout==""
+      delegate_to: localhost
+    
+    - shell: cat /etc/ssh/sshd_config | grep "PasswordAuthentication yes"
+      register: PasswordAuthentication_result
+    
+    - debug: var=PasswordAuthentication_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] PasswordAuthentication setting is done correctly in /etc/ssh/sshd_config file\n{{ PasswordAuthentication_result.stdout }}"
+      when: PasswordAuthentication_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] PasswordAuthentication setting is not done correctly in /etc/ssh/sshd_config file\n{{ PasswordAuthentication_result.stdout }}"
+      when: PasswordAuthentication_result.stdout==""
+      delegate_to: localhost
+    
+    - shell: cat /etc/ssh/sshd_config|grep "SyslogFacility AUTHPRIV"
+      register: SyslogFacility_result
+    
+    - debug: var=SyslogFacility_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] SyslogFacility setting is done correctly in /etc/ssh/sshd_config file\n{{ SyslogFacility_result.stdout }}"
+      when: SyslogFacility_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] SyslogFacility setting is not done correctly in /etc/ssh/sshd_config file\n{{ SyslogFacility_result.stdout }}"
+      when: SyslogFacility_result.stdout==""
+      delegate_to: localhost
+    
+    - shell: cat /etc/ssh/ssh_config|grep "StrictHostKeyChecking no"
+      register: StrictHostKeyChecking_result
+    
+    - debug: var=StrictHostKeyChecking_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] StrictHostKeyChecking setting is done correctly in /etc/ss/sshd_config file\n{{ StrictHostKeyChecking_result.stdout }}"
+      when: StrictHostKeyChecking_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] StrictHostKeyChecking setting is not done correctly in /etc/ssh/ssh_config file\n{{ StrictHostKeyChecking_result.stdout }}"
+      when: StrictHostKeyChecking_result.stdout==""
+      delegate_to: localhost
+    
+    - shell: cat /etc/ssh/ssh_config.d/05-redhat.conf | grep "SendEnv LC_IDENTIFICATION LC_ALL"
+      register: LC_IDENTIFICATION_result
+    
+    - debug: var=LC_IDENTIFICATION_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] LC_IDENTIFICATION setting is done correctly in /etc/ssh/ssh_config.d/05-redhat.conf file\n{{ LC_IDENTIFICATION_result.stdout }}"
+      when: LC_IDENTIFICATION_result.stdout!="" and LC_IDENTIFICATION_result.stdout.find("LANGUAGE")==-1
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] LC_IDENTIFICATION setting is not done correctly in /etc/ssh/ssh_config.d/05-redhat.conf file\n{{ LC_IDENTIFICATION_result.stdout }}"
+      when: LC_IDENTIFICATION_result.stdout=="" or LC_IDENTIFICATION_result.stdout.find("LANGUAGE")!=-1
+      delegate_to: localhost
+    
+################################## print /etc/rsyslog.conf settings ################################################
+    - shell: cat /etc/rsyslog.conf|grep std_tmpl
+      register: std_tmpl_result
+    - debug: var=std_tmpl_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] std_tmpl setting is done correctly in /etc/rsyslog.conf file\n{{ std_tmpl_result.stdout }}"
+      when: std_tmpl_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] std_tmpl setting is not done correctly in /etc/rsyslog.conf file\n{{ std_tmpl_result.stdout }}"
+      when: std_tmpl_result.stdout==""
+      delegate_to: localhost
+    
+    - shell: cat /etc/rsyslog.conf |grep "RULES\|template"
+      register: template_result
+    - debug: var=template_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] $template setting is done correctly in /etc/rsyslog.conf file\n{{ template_result.stdout }}"
+      when: template_result.stdout.find("template")!=-1
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] $template setting is not done correctly in /etc/rsyslog.conf file\n{{ template_result.stdout }}"
+      when: template_result.stdout.find("template")==-1
+      delegate_to: localhost
+    
+    - shell: cat /etc/logrotate.conf|grep "wtmp\|btmp" -A 5
+      register: logrotate_result
+    - debug: var=logrotate_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] log_rotate.conf setting is done correctly in /etc/log_rotate.conf file\n{{ logrotate_result.stdout }}"
+      when: logrotate_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] log_rotate.conf setting is not done correctly in /etc/log_rotate.conf file\n{{ logrotate_result.stdout }}"
+      when: logrotate_result.stdout==""
+      delegate_to: localhost
+    
+################################## print /etc/logrotate.d settings ################################################
+    - name: Verify /etc/logrotate.d/wtmp exists
+      stat:
+        path: /etc/logrotate.d/wtmp
+      register: wtmp_status
+
+    - debug: var=wtmp_status.stat.exists
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] /etc/logrotate.d/wtmp do not exist"
+        create: yes
+      when: wtmp_status.stat.exists==false
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] /etc/logrotate.d/wtmp exists"
+      when: wtmp_status.stat.exists
+      delegate_to: localhost
+
+    - name: Verify /etc/logrotate.d/btmp exists
+      stat:
+        path: /etc/logrotate.d/btmp
+      register: btmp_status
+
+    - debug: var=btmp_status.stat.exists
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] /etc/logrotate.d/btmp do not exist"
+      when: btmp_status.stat.exists==false
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] /etc/logrotate.d/btmp exists"
+      when: btmp_status.stat.exists
+      delegate_to: localhost
+
+################################## print auditd settings ################################################
+    - shell: auditctl -l|grep always
+      register: audit_ctl_result
+      when: execute_auditd
+
+#    - debug: var=audit_ctl_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] audit_ctl setting is done correctly in /etc/audit/rules.d/10-base-config.rules file\n{{ audit_ctl_result.stdout }}"
+      when: audit_ctl_result.stdout!="" and execute_auditd
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] audit_ctl setting is not done correctly in /etc/audit/rules.d/10-base-config.rules file\n{{ audit_ctl_result.stdout }}"
+      when: audit_ctl_result.stdout=="" and execute_auditd
+      delegate_to: localhost
+    
+################################## print grub settings ################################################
+    - name: cat /etc/default/grub | grep crashkernel=768M@64M
+      shell: cat /etc/default/grub | grep crashkernel=768M@64M
+      register: grub_file_result
+    
+    - debug: var=grub_file_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] grub_file setting is done correctly in /etc/default/grub file\n{{ grub_file_result.stdout }}"
+      when: grub_file_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] grub_file setting is not done correctly in /etc/default/grub file\n{{ grub_file_result.stdout }}"
+      when: grub_file_result.stdout==""
+      delegate_to: localhost
+    
+################################## print /etc/kdump.conf settings ################################################
+    - name: Check /etc/kdump.conf settings
+      shell: cat /etc/kdump.conf|grep "path /var/crash"
+      register: kdump_result
+    
+    - debug: var=kdump_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] kdump setting done correctly in /etc/kdump.conf file\n{{ kdump_result.stdout }}"
+      when: kdump_result.stdout=="path /var/crash"
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] kdump setting is not done correctly in /etc/kdump.conf file\n{{ kdump_result.stdout }}"
+      when: kdump_result.stdout!="path /var/crash"
+      delegate_to: localhost
+    
+################################## print /etc/login.defs settings ################################################
+    - name: Check /etc/login.defs settings
+      shell: cat /etc/login.defs | grep 99999
+      register: PASS_MAX_DAYS_result
+    
+    - debug: var=PASS_MAX_DAYS_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] PASS_MAX_DAYS setting done correctly in /etc/login.defs file\n{{ PASS_MAX_DAYS_result.stdout }}"
+      when: PASS_MAX_DAYS_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] PASS_MAX_DAYS setting is not done correctly in /etc/login.defs file\n{{ PASS_MAX_DAYS_result.stdout }}"
+      when: PASS_MAX_DAYS_result.stdout==""
+      delegate_to: localhost
+    
+################################## print /etc/security/limits.conf settings ################################################
+    - name: Check limits.conf status
+      shell: cat /etc/security/limits.conf|grep "weblogic\|oracle"
+      register: limits_conf_result
+      when: execute_limits_conf 
+    - debug: var=limits_conf_result.stdout
+      when: execute_limits_conf
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] limits.conf setting done correctly in /etc/security/limits.conf file\n{{ limits_conf_result.stdout }}"
+      when: execute_limits_conf and limits_conf_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] limits.conf setting is not done correctly in /etc/security/limits.conf file\n{{ limits_conf_result.stdout }}"
+      when: execute_limits_conf and limits_conf_result.stdout==""
+      delegate_to: localhost
+    
+################################## print /etc/cloud/cloud.cfg settings ################################################
+    - name: Verify -ssh parameter in /etc/cloud/cloud.cfg
+      shell: cat /etc/cloud/cloud.cfg|grep "# - ssh"
+      register: cloudcfg_ssh_result
+    
+    - debug: var=cloudcfg_ssh_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] cloudcfg ssh setting is done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_ssh_result.stdout }}"
+      when: cloudcfg_ssh_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] cloudcfg ssh setting is not done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_ssh_result.stdout }}"
+      when: cloudcfg_ssh_result.stdout==""
+      delegate_to: localhost
+    
+    - name: Verify -locale parameter in /etc/cloud/cloud.cfg
+      shell: cat /etc/cloud/cloud.cfg|grep "# - locale"
+      register: cloudcfg_locale_result
+    
+    - debug: var=cloudcfg_locale_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] cloudcfg locale setting is done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_locale_result.stdout }}"
+      when: cloudcfg_locale_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] cloudcfg locale setting is not done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_locale_result.stdout }}"
+      when: cloudcfg_locale_result.stdout==""
+      delegate_to: localhost
+    
+    - name: Verify -timezone parameter in /etc/cloud/cloud.cfg
+      shell: cat /etc/cloud/cloud.cfg|grep "# - timezone"
+      register: cloudcfg_timezone_result
+    
+    - debug: var=cloudcfg_timezone_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] cloudcfg timezone setting is done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_timezone_result.stdout }}"
+      when: cloudcfg_timezone_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] cloudcfg timezone setting is not done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_timezone_result.stdout }}"
+      when: cloudcfg_timezone_result.stdout==""
+      delegate_to: localhost
+    
+    - name: Verify -ssh_pwauth parameter in /etc/cloud/cloud.cfg
+      shell: cat /etc/cloud/cloud.cfg|grep "ssh_pwauth"
+      register: cloudcfg_ssh_pwauth_result
+    
+    - debug: var=cloudcfg_ssh_pwauth_result.stdout
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] cloudcfg ssh_pwauth setting is done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_ssh_pwauth_result.stdout }}"
+      when: cloudcfg_ssh_pwauth_result.stdout!="" and cloudcfg_ssh_pwauth_result.stdout.find("1")!=-1
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] cloudcfg ssh_pwauth setting is not done correctly in /etc/cloud/cloud.cfg file\n{{ cloudcfg_ssh_pwauth_result.stdout }}"
+      when: cloudcfg_ssh_pwauth_result.stdout=="" or cloudcfg_ssh_pwauth_result.stdout.find("1")==-1
+      delegate_to: localhost
+    
+################################## print /etc/motd settings ################################################
+    - name: Verify /etc/motd contents
+      shell: cat /etc/motd
+      register: motd_result
+    
+    - debug: var=motd_result.stdout
+    - debug: var=motd_message
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] motd banner setting is done correctly in /etc/motd file\n{{ motd_result.stdout }}"
+      when: motd_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "[ERROR] motd banner setting is not done correctly in /etc/motd file\n{{ motd_result.stdout }}"
+      when: motd_result.stdout==""
+      delegate_to: localhost
+    
+################################## print /etc/chrony.conf settings ################################################
+    - name: Verify /etc/chrony.conf contents
+      shell: cat /etc/chrony.conf | grep "server 169.254.169.123 prefer iburst minpoll 4 maxpoll 4"
+      register: chrony_result
+    
+    - debug: var=chrony_result.stdout
+    
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] chrony.conf setting is done correctly in /etc/chrony.conf file\n{{ chrony_result.stdout }}"
+      when: chrony_result.stdout!=""
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] chrony.conf setting is not done correctly in /etc/chrony.conf file\n{{ chrony_result.stdout }}"
+      when: chrony_result.stdout==""
+      delegate_to: localhost
+
+################################## print root user settings ################################################
+    - name: Verify root user uid
+      shell: id root
+      register: uid_root
+
+    - debug: var=uid_root.stdout
+
+    - shell: echo "[INFO] root user UID --- {{ uid_root.stdout }} is set correctly" >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: uid_root is search('uid=0')
+      delegate_to: localhost
+
+    - shell: echo "[ERROR] root user UID is not set correctly to 0. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: not uid_root is search('uid=0')
+      delegate_to: localhost
+
+    - name: Verify root home directory
+      shell: cat /etc/passwd | grep root
+      register: root_home
+
+    - debug: var=root_home.stdout
+
+    - shell: echo "[INFO] root user Home Directory "/root" is set correctly" >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: root_home is search('root:x:0:0:root:/root')
+      delegate_to: localhost
+
+    - shell: echo "[ERROR] root user Home Directory is not set correctly. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: not root_home is search('root:x:0:0:root:/root')
+      delegate_to: localhost
+    
+################################## print mqm user settings ################################################
+    - name: Verify mqm user id
+      shell: id mqm
+      register: uid_mqm
+      when: execute_mq
+
+    - debug: var=uid_mq.stdout
+      when: execute_mq
+
+    - shell: echo "[INFO] mqm user UID --- {{ uid_mqm.stdout }} is set correctly" >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: execute_mq and uid_mqm is search('uid=502')
+      delegate_to: localhost
+
+    - shell: echo "[ERROR] mqm user UID is not set correctly to 502. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: execute_mq and not uid_mqm is search('uid=502')
+      delegate_to: localhost
+
+    - name: Verify mqm user home directory
+      shell: cat /etc/passwd | grep mqm
+      register: mqm_home
+      when: execute_mq
+
+    - debug: var=mq_home.stdout
+      when: execute_mq
+
+    - shell: echo "[INFO] mqm user Home Directory "/var/mqm" is set correctly" >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: execute_mq and mqm_home is search('mqm:x:502:502::/var/mqm')
+      delegate_to: localhost
+
+    - shell: echo "[ERROR] mqm user Home Directory is not set correctly. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: execute_mq and not mqm_home is search('mqm:x:502:502::/var/mqm')
+      delegate_to: localhost
+
+################################## print disk settings ################################################
+      #section 3 disk verifications
+    - name: Read device information for {{ device_nvme0n1 }}
+      parted:
+        device: "{{ device_nvme0n1.name }}"
+        unit: "GiB"
+      register: nvme0n1_info
+    
+    - debug: var=nvme0n1_info.disk.size
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] {{ device_nvme0n1.name }} -- {{ device_nvme0n1.size }}GiB is setup correctly on system {{ nvme0n1_info.disk.size }}GiB"
+      when:  device_nvme0n1.size == nvme0n1_info.disk.size
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] {{ device_nvme0n1.name }} -- {{ device_nvme0n1.size }}GiB is not setup correctly on system as {{ nvme0n1_info.disk.size }}GiB"
+      when:  device_nvme0n1.size != nvme0n1_info.disk.size
+      delegate_to: localhost
+    
+    - name: Read device information for {{ device_nvme1n1 }}
+      parted:
+        device: "{{ device_nvme1n1.name }}"
+        unit: "GiB"
+      register: nvme1n1_info
+
+    - debug: var=nvme1n1_info.disk.size
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] {{ device_nvme1n1.name }} -- {{ device_nvme1n1.size }}GiB is setup correctly on system {{ nvme1n1_info.disk.size }}GiB"
+      when:  device_nvme1n1.size == nvme1n1_info.disk.size
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] {{ device_nvme1n1.name }} -- {{ device_nvme1n1.size }}GiB is not setup correctly on system as {{ nvme1n1_info.disk.size }}GiB"
+      when:  device_nvme1n1.size != nvme1n1_info.disk.size
+      delegate_to: localhost
+
+    - name: Read device information for {{ device_nvme2n1 }}
+      parted:
+        device: "{{ device_nvme2n1.name }}"
+        unit: "GiB"
+      register: nvme2n1_info
+
+    - debug: var=nvme2n1_info.disk.size
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] {{ device_nvme2n1.name }} -- {{ device_nvme2n1.size }}GiB is setup correctly on system {{ nvme2n1_info.disk.size }}GiB"
+      when:  device_nvme2n1.size == nvme2n1_info.disk.size
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] {{ device_nvme2n1.name }} -- {{ device_nvme2n1.size }}GiB is not setup correctly on system as {{ nvme2n1_info.disk.size }}GiB"
+      when:  device_nvme2n1.size != nvme2n1_info.disk.size
+      delegate_to: localhost
+    
+    - name: Read device information for swap
+      parted:
+        device: "{{ device_swap.name }}"
+        unit: "GiB"
+      register: swap_info
+    
+    - debug: var=swap_info.disk.size
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] {{ device_swap.name }} -- {{ device_swap.size }}GiB is setup correctly on system {{ swap_info.disk.size }}GiB"
+      when:  device_swap.size == swap_info.disk.size
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] {{ device_swap.name }} -- {{ device_swap.size }}GiB is not setup correctly on system as {{ swap_info.disk.size }}GiB"
+      when:  device_swap.size != swap_info.disk.size
+      delegate_to: localhost
+    
+    - name: Read device information for home1
+      parted:
+        device: "{{ device_home1.name }}"
+        unit: "GiB"
+      register: home1_info
+    
+    - debug: var=home1_info.disk.size
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] {{ device_home1.name }} -- {{ device_home1.size }}GiB is setup correctly on system {{ home1_info.disk.size }}GiB"
+      when:  device_home1.size == home1_info.disk.size
+      delegate_to: localhost
+    
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] {{ device_home1.name }} -- {{ device_home1.size }}GiB is not setup correctly on system as {{ home1_info.disk.size }}GiB"
+      when:  device_home1.size != home1_info.disk.size
+      delegate_to: localhost
+
+      #check output of different commands to get disk information
+    - name: Get output of lsblk command
+      shell: lsblk
+      register: lsblk_output
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] lsblk output --- {{ lsblk_output.stdout }}"
+      when:  lsblk_output is defined
+      delegate_to: localhost
+
+    - name: Get output of df -hT command
+      shell: df -hT
+      register: df_hT_output
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] df -hT output --- {{ df_hT_output.stdout }}"
+      when:  df_hT_output is defined
+      delegate_to: localhost
+
+    - name: Get output of /etc/fstab command
+      shell: cat /etc/fstab
+      register: etc_fstab_output
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] /etc/fstab output --- {{ etc_fstab_output.stdout }}"
+      when:  etc_fstab_output is defined
+      delegate_to: localhost
+
+    - name: Get output of /proc/swap command
+      shell: cat /proc/swaps
+      register: proc_swap_output
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] /proc/swap output --- {{ proc_swap_output.stdout }}"
+      when:  proc_swap_output is defined
+      delegate_to: localhost
+
+    - name: Get output of free -h command
+      shell: free -h
+      register: free_h_output
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] free -h output --- {{ free_h_output.stdout }}"
+      when:  free_h_output is defined
+      delegate_to: localhost
+
+################################## print sudoers settings ################################################
+    - shell: cat /etc/sudoers|grep "^root\|opc\|ln_dev\|ndpx_dev"
+      register: sudoers_result
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] sudoers setting is done correctly in /etc/sudoers file\n{{ sudoers_result.stdout }}"
+      when: sudoers_result.stdout!=""
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] sudoers setting is not done correctly in /etc/sudoers file\n{{ sudoers_result.stdout }}"
+      when: sudoers_result.stdout==""
+      delegate_to: localhost
+
+
+################################## print services settings ################################################
+    - name: "Check if services are running"
+      service:
+        name: "{{ item }}"
+      loop: "{{ check_services }}"
+      register: services_status
+
+      #    - debug: var=services_status.results[0].status.ActiveState
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[INFO] *************Checking services status**************" 
+      delegate_to: localhost
+
+    - name: List of services that are running
+      shell: echo "[INFO] {{ item.name }} is running. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.status.ActiveState=="active"
+      loop: "{{ services_status.results }}"
+      delegate_to: localhost
+
+    - name: List of services that are not running
+      shell: echo "[ERROR] {{ item.name }} is not running. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.status.ActiveState=="inactive" or item.status.ActiveState=="failed"
+      loop: "{{ services_status.results }}"
+      delegate_to: localhost
+
+    - name: List of services that are enabled
+      shell: echo "[INFO] {{ item.name }} is enabled. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.status.UnitFileState=="enabled"
+      loop: "{{ services_status.results }}"
+      delegate_to: localhost
+
+    - name: List of services that are not enabled
+      shell: echo "[INFO] {{ item.name }} is disabled. " >> "{{ OUTPUTFILE }}_{{ date }}.log"
+      when: item.status.UnitFileState=="disabled"
+      loop: "{{ services_status.results }}"
+      delegate_to: localhost
+
+# JP1 Settings Verification
+################################## print JP1 settings ################################################
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[INFO] *************Checking JP/BASE/AJS status**************"
+      when: execute_jp1
+      delegate_to: localhost
+
+    - name: Check permission of jbs_start.model
+      stat:
+        path: /etc/opt/jp1base/jbs_start.model
+      register: jbs_start
+      when: execute_jp1
+
+    - debug: var=jbs_start.stat.path
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] File --- {{ jbs_start.stat.path }} have correct permissions\nFile: {{ jbs_start.stat.path }}\nPermission: {{ jbs_start.stat.mode }}"
+      when: execute_jp1 and jbs_start.stat.mode is search('0700')
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] File --- {{ jbs_start.stat.path }} permission is wrong\nFile: {{ jbs_start.stat.path }}\nPermission: {{ jbs_start.stat.mode }}"
+      when: execute_jp1 not jbs_start.stat.mode is search('0700')
+      delegate_to: localhost
+
+    - name: Check permission of jbs_stop.model
+      stat:
+        path: /etc/opt/jp1base/jbs_stop.model
+      register: jbs_stop
+      when: execute_jp1
+    - debug: var=jbs_stop.stat.path
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] File --- {{ jbs_stop.stat.path }} have correct permissions\nFile: {{ jbs_stop.stat.path }}\nPermission: {{ jbs_stop.stat.mode }}"
+      when: execute_jp1 and jbs_stop.stat.mode is search('0700')
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] File --- {{ jbs_stop.stat.path }} permission is wrong\nFile: {{ jbs_stop.stat.path }}\nPermission: {{ jbs_stop.stat.mode }}"
+      when: execute_jp1 and not jbs_stop.stat.mode is search('0700')
+      delegate_to: localhost
+
+    - name: Check file jbs_start
+      stat:
+        path: /etc/opt/jp1base/jbs_start
+      register: jbs_start_post
+      when: execute_jp1
+    - debug: var=jbs_start_post.stat.path
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] File: /etc/opt/jp1base/jbs_start is created"
+      when: execute_jp1 and jbs_start_post.stat.exists
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] File: /etc/opt/jp1base/jbs_start is not created"
+      when: execute_jp1 and not jbs_start_post.stat.exists
+      delegate_to: localhost
+
+    - name: Check file jbs_stop
+      stat:
+        path: /etc/opt/jp1base/jbs_stop
+      register: jbs_stop_post
+      when: execute_jp1
+    - debug: var=jbs_stop_post.stat.path
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] File: /etc/opt/jp1base/jbs_stop is created"
+      when: execute_jp1 and jbs_stop_post.stat.exists
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] File: /etc/opt/jp1base/jbs_stop is not created"
+      when: execute_jp1 and not jbs_stop_post.stat.exists
+      delegate_to: localhost
+
+    - name: Verify auto-start script
+      shell: cat /etc/opt/jp1ajs2/jajs_start | grep "/opt/jp1ajs2/bin/jajs_spmd >/dev/null 2>/dev/null"
+      register: jp1_auto_result
+      when: execute_jp1
+    - debug: var=jp1_auto_result.stdout
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[INFO] auto-start script setting is done correctly in /etc/opt/jp1ajs2/jajs_start file\n{{ jp1_auto_result.stdout }}"
+      when: execute_jp1 and jp1_auto_result.stdout!=""
+      delegate_to: localhost
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line:  "\n[ERROR] auto-start script setting is not done correctly in /etc/opt/jp1ajs2/jajs_start file\n{{ jp1_auto_result.stdout }}"
+      when: execute_jp1 and jp1_auto_result.stdout==""
+      delegate_to: localhost
+
+    - name: Check JP1 Base Status
+      shell: /opt/jp1base/bin/jbs_spmd_status
+      register: jp1_base_status
+      when: execute_jp1
+    - debug: var=jp1_base_status.stdout
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[STATUS] Find the status of jbs_spmd_status\n{{ jp1_base_status.stdout_lines }}"
+      when: execute_jp1 and jp1_base_status.stdout!=""
+      delegate_to: localhost
+
+    - name: Check JP1 jevstat Status
+      shell: /opt/jp1base/bin/jevstat
+      register: jp1_jevstat_status
+      when: execute_jp1
+    - debug: var=jp1_jevstat_status.stdout
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[STATUS] Find the status of /opt/jp1base/bin/jevstat\n{{ jp1_jevstat_status.stdout_lines }}"
+      when: execute_jp1 and jp1_jevstat_status.stdout!=""
+      delegate_to: localhost
+
+    - name: Check JP1 AJS Status
+      shell: /opt/jp1ajs2/bin/jajs_spmd_status
+      register: jp1_ajs_status
+      when: execute_jp1
+    - debug: var=jp1_ajs_status.stdout
+      when: execute_jp1
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[STATUS] Find the status of /opt/jp1ajs2/bin/jajs_spmd_status\n{{ jp1_ajs_status.stdout_lines }}"
+      when: execute_jp1 and jp1_ajs_status.stdout!=""
+      delegate_to: localhost
+
+# MQ Settings Verification
+################################## print MQ settings ################################################
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[INFO] *************Checking MQ status**************"
+      delegate_to: localhost
+      when: execute_mq
+
+    - name: Check MQ Installation Status
+      shell: dspmqver
+      register: mq_status
+      when: execute_mq
+    - debug: var=mq_status.stdout_lines
+      when: execute_mq
+
+    - lineinfile:
+        path: "{{ OUTPUTFILE }}_{{ date }}.log"
+        line: "\n[STATUS] Find the status of MQ dspmqver\n{{ mq_status.stdout_lines }}"
+      when: execute_mq and mq_status.stdout!=""
+      delegate_to: localhost
+  ignore_errors: true

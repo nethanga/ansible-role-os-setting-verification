@@ -1,0 +1,139 @@
+*************************************Verification results are as follows:***************************
+
+[ERROR] hostname is not set correctly
+ip-172-32-164-220.ap-south-1.compute.internal
+[INFO] *************Checking common packages which are part of AMI**************
+[INFO] cronie is installed. Proceeding to next check
+[INFO] fence-agents-kdump is installed. Proceeding to next check
+[INFO] kexec-tools is installed. Proceeding to next check
+[INFO] net-snmp-libs is installed. Proceeding to next check
+[INFO] net-tools is installed. Proceeding to next check
+[INFO] lvm2 is installed. Proceeding to next check
+[ERROR] bc is not installed. Proceeding to next check
+[ERROR] bind-utils is not installed. Proceeding to next check
+[ERROR] expect is not installed. Proceeding to next check
+[ERROR] ftp is not installed. Proceeding to next check
+[ERROR] lsof is not installed. Proceeding to next check
+[ERROR] ncompress is not installed. Proceeding to next check
+[ERROR] net-snmp is not installed. Proceeding to next check
+[ERROR] portreserve is not installed. Proceeding to next check
+[ERROR] nmap-ncat is not installed. Proceeding to next check
+[ERROR] sos.noarch is not installed. Proceeding to next check
+[ERROR] strace is not installed. Proceeding to next check
+[ERROR] sysstat is not installed. Proceeding to next check
+[ERROR] tcpdump is not installed. Proceeding to next check
+[ERROR] tk is not installed. Proceeding to next check
+[ERROR] traceroute is not installed. Proceeding to next check
+[ERROR] wget is not installed. Proceeding to next check
+[ERROR] vsftpd is not installed. Proceeding to next check
+[ERROR] zip is not installed. Proceeding to next check
+[ERROR] glibc-locale-source is not installed. Proceeding to next check
+[ERROR] langpacks-ja.noarch is not installed. Proceeding to next check
+[ERROR] amazon-cloudwatch-agent is not installed. Proceeding to next check
+[ERROR] amazon-ssm-agent is not installed. Proceeding to next check
+[ERROR] aws-cli is not installed. Proceeding to next check
+[INFO] *************Checking group1 common packages**************
+[INFO] Group1 package -- cifs-utils is installed. Proceeding to next check
+[INFO] Group1 package -- net-snmp-utils is installed. Proceeding to next check
+[ERROR] Group1 package -- lftp is not installed. Proceeding to next check
+[ERROR] Group1 package -- libnsl is not installed. Proceeding to next check
+[INFO] *************Checking group2 common packages**************
+[ERROR] Group2 package -- man-pages.noarch is not installed. Proceeding to next check
+[ERROR] Group2 package -- xfsdump is not installed. Proceeding to next check
+[INFO] *************Checking VM specific packages**************
+[INFO] VM specific package -- lvm2 is installed. Proceeding to next check
+[ERROR] VM specific package -- nc is not installed. Proceeding to next check
+[ERROR] SELINUX setting is not done correctly in /etc/sysconfig/selinux file
+
+
+[INFO] firewalld.service status is set correctly
+
+
+[INFO] default_runlevel is set correctly
+lrwxrwxrwx. 1 root root 37 May  4  2021 /etc/systemd/system/default.target -> /lib/systemd/system/multi-user.target
+
+[ERROR] localectl is not set correctly
+
+
+[ERROR] timedatectl is not set correctly
+
+
+[ERROR] ipv6 is not set correctly
+
+
+[ERROR] net.ipv6.conf.default.disable_ipv6 is not set correctly
+
+
+[ERROR] ipv4 is not set correctly
+
+
+[ERROR] kernel.sysrq is not set correctly
+
+
+[ERROR] kernel.unknown_nmi_panic is not set correctly
+
+
+[ERROR] net.ipv4.conf.all.accept_redirects is not set correctly
+
+
+[INFO] gpgcheck value is set correctly
+gpgcheck=1
+
+[INFO] installonly_limit value is set correctly
+installonly_limit=3
+
+[INFO] clean_requirements_on_remove value is set correctly
+clean_requirements_on_remove=True
+
+[INFO] best value is set correctly
+best=True
+
+[INFO] skip_if_unavailable value is set correctly
+skip_if_unavailable=False
+[ERROR] Ciphers entry is not set correctly in /etc/ssh/sshd_config
+
+
+[INFO] CRYPTO setting done correctly in /etc/sysconfig/sshd file
+# CRYPTO_POLICY=
+
+[INFO] PermitRootLogin setting is done correctly in /etc/ssh/sshd_config file
+# the setting of "PermitRootLogin without-password".
+
+[INFO] PasswordAuthentication setting is done correctly in /etc/ssh/sshd_config file
+#PasswordAuthentication yes
+
+[INFO] SyslogFacility setting is done correctly in /etc/ssh/sshd_config file
+SyslogFacility AUTHPRIV
+[ERROR] StrictHostKeyChecking setting is not done correctly in /etc/ssh/ssh_config file
+
+
+[INFO] LC_IDENTIFICATION setting is done correctly in /etc/ssh/ssh_config.d/05-redhat.conf file
+	SendEnv LC_IDENTIFICATION LC_ALL LANGUAGE
+[ERROR] std_tmpl setting is not done correctly in /etc/rsyslog.conf file
+
+[ERROR] $template setting is not done correctly in /etc/rsyslog.conf file
+
+[ERROR] log_rotate.conf setting is not done correctly in /etc/log_rotate.conf file
+
+[ERROR] audit_ctl setting is not done correctly in /etc/audit/rules.d/10-base-config.rules file
+
+[ERROR] grub_file setting is not done correctly in /etc/default/grub file
+
+
+[INFO] kdump setting done correctly in /etc/kdump.conf file
+path /var/crash
+[ERROR] PASS_MAX_DAYS setting is not done correctly in /etc/login.defs file
+PASS_MAX_DAYS	99999
+[ERROR] limits.conf setting is not done correctly in /etc/security/limits.conf file
+
+[ERROR] cloudcfg ssh setting is not done correctly in /etc/cloud/cloud.cfg file
+
+[ERROR] cloudcfg locale setting is not done correctly in /etc/cloud/cloud.cfg file
+
+[ERROR] cloudcfg timezone setting is not done correctly in /etc/cloud/cloud.cfg file
+
+
+[INFO] cloudcfg ssh_pwauth setting is done correctly in /etc/cloud/cloud.cfg file
+ssh_pwauth:   0
+[ERROR] motd banner setting is not done correctly in /etc/motd file
+

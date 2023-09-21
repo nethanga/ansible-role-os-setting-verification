@@ -1,0 +1,113 @@
+---
+- name: Install packages
+  hosts: group1
+  become: yes
+  gather_facts: false
+  vars:
+   p_list:
+    - systemd-update-utmp-runlevel.service
+    - dev-hugepages.mount
+    - dev-mqueue.mount
+    - dmraid-activation.service
+    - kmod-static-nodes.service
+    - lvm2-lvmetad.socket
+    - lvm2-lvmpolld.socket
+    - lvm2-monitor.service
+    - multipathd.service
+    - proc-sys-fs-binfmt_misc.automount
+    - rhel-autorelabel-mark.service
+    - rhel-autorelabel.service
+    - rhel-domainname.service
+    - rhel-import-state.service
+    - rhel-loadmodules.service
+    - sys-fs-fuse-connections.mount
+    - sys-kernel-config.mount
+    - sys-kernel-debug.mount
+    - systemd-ask-password-console.path
+    - systemd-binfmt.service
+    - systemd-firstboot.service
+    - systemd-hwdb-update.service
+    - systemd-journal-catalog-update.service
+    - systemd-journal-flush.service
+    - systemd-journald.service
+    - systemd-machine-id-commit.service
+    - systemd-modules-load.service
+    - systemd-random-seed.service
+    - systemd-sysctl.service
+    - systemd-tmpfiles-setup-dev.service
+    - systemd-tmpfiles-setup.service
+    - systemd-udev-trigger.service
+    - systemd-udevd.service
+    - systemd-update-done.service
+    - systemd-update-utmp.service
+    - systemd-vconsole-setup.service
+    - uptrack.service
+    - local-fs.target
+    - boot.mount
+    - export-backup.mount
+    - export.mount
+    - rhel-readonly.service
+    - systemd-fsck-root.service
+    - systemd-remount-fs.service
+    - dev-xvdc.swap
+    - acpid.service
+    - auditd.service
+    - autoprotect.service
+    - brandbot.path
+    - chronyd.service
+    - crond.service
+    - dbus.service
+    - dovecot.service
+    - hinemos_agent.service
+    - irqbalance.service
+    - mdmonitor.service
+    - network.service
+    - nfs-server.service
+    - opc-guest-agent.service
+    - opc-linux-init.service
+    - proftpd.service
+    - rhel-configure.service
+    - rpcbind.service
+    - rsyslog.service
+    - rtvscand.service
+    - sendmail.service
+    - sm-client.service
+    - smcd.service
+    - snmpd.service
+    - sshd.service
+    - symcfgd.service
+    - systemd-ask-password-wall.path
+    - systemd-logind.service
+    - systemd-readahead-collect.service
+    - systemd-readahead-replay.service
+    - systemd-user-sessions.service
+    - tuned.service
+    - uptrack-prefetch.service
+    - basic.target
+    - rhel-dmesg.service
+    - selinux-policy-migrate-local-changes@targeted.serv
+    - system.slice
+    - dbus.socket
+    - dm-event.socket
+    - rpcbind.socket
+    - systemd-initctl.socket
+    - systemd-journald.socket
+    - systemd-shutdownd.socket
+    - systemd-udevd-control.socket
+    - systemd-udevd-kernel.socket
+    - systemd-tmpfiles-clean.timer
+    - getty@tty1.service
+    - serial-getty@ttyS0.service
+    - serial_console.service
+    - auth-rpcgss-module.service
+    - rpc-statd-notify.service
+    - auth-rpcgss-module.service
+    - rpc-statd-notify.service
+    - display-manager.service
+
+  tasks:
+    - name: check service status
+      shell: systemctl list-dependencies graphical.target |grep "{{ item }}"
+      loop: "{{ p_list }}"
+      ignore_errors: true
+

@@ -1,0 +1,31 @@
+---
+- name: Install packages
+  hosts: group2
+  become: yes
+  gather_facts: false
+  vars:
+   p_list:
+      - java-1.8.0-openjdk-1:1.8.0.312.b07-2.el8_5
+
+  tasks:
+#    - name: set codeready
+#      shell: dnf config-manager --set-enabled codeready-builder-for-rhel-8-rhui-rpms
+
+    - name: install packages
+#      shell: yum list installed "{{ item }}"
+      shell: yum install -y "{{ item }}"
+      loop: "{{ p_list }}"
+      ignore_errors: true
+
+#    - name: "Check if AMI packages are installed or not"
+#      shell: yum list installed "{{ item }}"
+#      loop: "{{ p_list }}"
+#      register: AMI_packages_check
+#      ignore_errors: true
+
+#    - name: List of AMI packages which are not installed      
+#      shell: echo "{{ item.cmd | regex_replace('^u','') }} " >> "plist_revodbt01.txt"
+#      when: item.failed == true
+#      loop: "{{ AMI_packages_check.results }}"
+#      delegate_to: localhost
+      

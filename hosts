@@ -1,0 +1,13 @@
+[group1]
+lapend02
+
+
+[group2]
+lapend01
+
+[test]
+ansible_test_kyndryl_linux.t-ln-svc
+
+[all:vars]
+ansible_ssh_user=*****
+ansible_ssh_pass=********
